@@ -11,7 +11,11 @@ extern int g_iDPAD_rotate;
 
 void *threadGetFifoMessages(void *argumentPointer)
 {
+#ifdef RGB30
+	const char* file = "/home/ark/mypipe";
+#else
 	const char* file = "/home/odroid/mypipe";
+#endif
 	int fd = open(file, O_RDONLY);
 	if (fd < 0) 
 	{

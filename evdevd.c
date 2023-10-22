@@ -1,24 +1,3 @@
-/*
- * Copyright © 2013 Red Hat, Inc.
- *
- * Permission to use, copy, modify, distribute, and sell this software and its
- * documentation for any purpose is hereby granted without fee, provided that
- * the above copyright notice appear in all copies and that both that copyright
- * notice and this permission notice appear in supporting documentation, and
- * that the name of the copyright holders not be used in advertising or
- * publicity pertaining to distribution of the software without specific,
- * written prior permission.  The copyright holders make no representations
- * about the suitability of this software for any purpose.  It is provided "as
- * is" without express or implied warranty.
- *
- * THE COPYRIGHT HOLDERS DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,
- * INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO
- * EVENT SHALL THE COPYRIGHT HOLDERS BE LIABLE FOR ANY SPECIAL, INDIRECT OR
- * CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE,
- * DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
- * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE
- * OF THIS SOFTWARE.
- */
 
 //#include "config.h"
 
@@ -45,6 +24,7 @@ enum
 {
 	CONTROLLER_OGA = 0, // RK2020 is same
 	CONTROLLER_RG351P,
+	CONTROLLER_RGB30,
 	NUM_OF_CONTROLLER
 };
 
@@ -289,22 +269,22 @@ typedef union
 	unsigned int val;
 	struct 
 	{
-		unsigned int b0:1;
-		unsigned int b1:1;
-		unsigned int b2:1;
-		unsigned int b3:1;
-		unsigned int b4:1;
-		unsigned int b5:1;
-		unsigned int b6:1;
-		unsigned int b7:1;		
+		unsigned int b0:1; // south
+		unsigned int b1:1; // east
+		unsigned int b2:1; // c
+		unsigned int b3:1; // north, x
+		unsigned int b4:1; // west, y
+		unsigned int b5:1; // z
+		unsigned int b6:1; // tl
+		unsigned int b7:1; // tr		
 		
-		unsigned int b8:1;
-		unsigned int b9:1;
-		unsigned int b10:1;
-		unsigned int b11:1;
-		unsigned int b12:1;
-		unsigned int b13:1;
-		unsigned int b14:1;
+		unsigned int b8:1; // tl2
+		unsigned int b9:1; // tr2
+		unsigned int b10:1; // select
+		unsigned int b11:1; // start
+		unsigned int b12:1; // mode
+		unsigned int b13:1; // thumbl
+		unsigned int b14:1; // thumbr
 		unsigned int b15:1;	
 		
 		unsigned int b16:1;
@@ -325,6 +305,45 @@ typedef union
 		unsigned int hright:1;	
 		unsigned int power:1;	
 	} bits;
+
+	struct 
+	{
+		unsigned int a:1;
+		unsigned int b:1;
+		unsigned int c:1;
+		unsigned int x:1;
+		unsigned int y:1;
+		unsigned int z:1; 
+		unsigned int tl:1;
+		unsigned int tr:1;	
+		
+		unsigned int tl2:1;
+		unsigned int tr2:1;
+		unsigned int select:1;
+		unsigned int start:1;
+		unsigned int mode:1;
+		unsigned int thumbl:1;
+		unsigned int thumbr:1;
+		unsigned int b15:1;	
+		
+		unsigned int b16:1;
+		unsigned int b17:1;
+		unsigned int b18:1;
+		unsigned int b19:1;
+		unsigned int b20:1;
+		unsigned int b21:1;
+		unsigned int b22:1;
+		unsigned int b23:1;	
+		
+		unsigned int b24:1;	
+		unsigned int b25:1;	
+		unsigned int b26:1;	
+		unsigned int hup:1;
+		unsigned int hdown:1;
+		unsigned int hleft:1;
+		unsigned int hright:1;	
+		unsigned int power:1;	
+	} joybit;
 	
 	struct 
 	{
@@ -389,6 +408,9 @@ void emit(int fd, int type, int code, int val)
 
 void bindbuttons(int fd, int code, int value)
 {
+#ifdef RGB30
+	static int g_ihatx=0, g_ihaty=0;
+#endif
 	// RG351P
 	/*
     Event code 304 (BTN_SOUTH) a
@@ -458,6 +480,108 @@ void bindbuttons(int fd, int code, int value)
 				break;				
 		};
 	}
+#ifdef RGB30
+	else if (g_iDetected_Controller == CONTROLLER_RGB30){
+		switch(code)
+		{
+			// RGB30
+			case BTN_EAST: // a
+				if (enableswapAB)
+					bindcode = BTN_SOUTH;
+				else		
+					bindcode = BTN_EAST;
+				break;			
+
+			case BTN_SOUTH: // b
+				if (enableswapAB)
+					bindcode = BTN_EAST;
+				else
+					bindcode = BTN_SOUTH;
+				break;
+			case BTN_NORTH: // x
+			case BTN_WEST: // y
+			case BTN_TL:
+			case BTN_TR:
+			case BTN_TL2:
+			case BTN_TR2:
+			case BTN_SELECT:
+			case BTN_START:
+			case BTN_THUMBL:
+			case BTN_THUMBR:
+				bindcode = code;
+				break;	
+			case BTN_DPAD_UP:
+				bindcode = 0;
+				
+				if (value > 0) {
+					g_ihaty = -1;
+					
+					emit(fd, EV_ABS, ABS_HAT0Y, -1);
+					emit(fd, EV_SYN, SYN_REPORT, 0);
+				}
+				else {
+					if (g_ihaty == -1) {
+						emit(fd, EV_ABS, ABS_HAT0Y, 0);
+						emit(fd, EV_SYN, SYN_REPORT, 0);
+					}
+				}
+
+				break;
+			case BTN_DPAD_DOWN:
+				bindcode = 0;
+				
+				if (value > 0) {
+					g_ihaty = 1;
+
+					emit(fd, EV_ABS, ABS_HAT0Y, 1);
+					emit(fd, EV_SYN, SYN_REPORT, 0);
+				}
+				else {
+					if (g_ihaty  == 1) {
+						emit(fd, EV_ABS, ABS_HAT0Y, 0);
+						emit(fd, EV_SYN, SYN_REPORT, 0);
+					}
+				}
+
+				break;
+				
+			case BTN_DPAD_LEFT:
+				bindcode = 0;
+
+				if (value > 0) {
+					g_ihatx = -1;
+					
+					emit(fd, EV_ABS, ABS_HAT0X, -1);
+					emit(fd, EV_SYN, SYN_REPORT, 0);
+				}
+				else {
+					if (g_ihatx == -1) {
+						emit(fd, EV_ABS, ABS_HAT0X, 0);
+						emit(fd, EV_SYN, SYN_REPORT, 0);
+					}
+				}
+				
+				break;
+			case BTN_DPAD_RIGHT:
+				bindcode = 0;
+
+				if (value > 0) {
+					g_ihatx = 1;
+					
+					emit(fd, EV_ABS, ABS_HAT0X, 1);
+					emit(fd, EV_SYN, SYN_REPORT, 0);
+				}
+				else {
+					if (g_ihatx == 1) {
+						emit(fd, EV_ABS, ABS_HAT0X, 0);
+						emit(fd, EV_SYN, SYN_REPORT, 0);
+					}
+				}
+				
+				break;
+		};		
+	}
+#endif
 	else{
 		switch(code)
 		{
@@ -715,12 +839,20 @@ gboolean on_read_data(GIOChannel* source, GIOCondition condition)
 			switch(ev.code)
 			{
 				case FF_RUMBLE:
+#ifdef RGB30
+					sprintf(cmds, "echo %d >> /home/ark/ff_rumble.txt", ev.value);
+#else
 					sprintf(cmds, "echo %d >> /home/odroid/ff_rumble.txt", ev.value);
+#endif
 					system(cmds);			
 					break;
 
 				case FF_GAIN:
+#ifdef RGB30
+					sprintf(cmds, "echo %d >> /home/ark/ff_gain.txt", ev.value);
+#else
 					sprintf(cmds, "echo %d >> /home/odroid/ff_gain.txt", ev.value);
+#endif
 					system(cmds);			  
 					//m_ff_handler->set_gain(ev.value);
 					break;
@@ -746,17 +878,29 @@ gboolean on_read_data(GIOChannel* source, GIOCondition condition)
 					{
 						if (magnitude)
 						{
+#ifdef RGB30
+						  sprintf(cmds, "echo %d > /sys/class/pwm/pwmchip1/pwm0/duty_cycle", 10000 - (int)(((float)magnitude / 0xffff) * 10000));
+#else
 						  sprintf(cmds, "echo %d > /sys/class/pwm/pwmchip0/pwm0/duty_cycle", 10000 - (int)(((float)magnitude / 0xffff) * 10000));
+#endif
 						  system(cmds);							
 						}
 						else{
+#ifdef RGB30
+						  sprintf(cmds, "echo %d > /sys/class/pwm/pwmchip1/pwm0/duty_cycle", 10/* - (int)(((float)0x5a / 255.0) * 1000000)*/);
+#else
 						  sprintf(cmds, "echo %d > /sys/class/pwm/pwmchip0/pwm0/duty_cycle", 10/* - (int)(((float)0x5a / 255.0) * 1000000)*/);
+#endif
 						  system(cmds);
 						}
 					}
 					else
 					{
+#ifdef RGB30
+						  sprintf(cmds, "echo %d > /sys/class/pwm/pwmchip1/pwm0/duty_cycle", 10000 - (int)(((float)0 / 255.0) * 10000));
+#else
 						  sprintf(cmds, "echo %d > /sys/class/pwm/pwmchip0/pwm0/duty_cycle", 10000 - (int)(((float)0 / 255.0) * 10000));
+#endif
 						  system(cmds);
 					}						
 					/*
@@ -921,7 +1065,11 @@ main(int argc, char **argv)
 {
 	//struct libevdev *dev = NULL;
 	struct libevdev *dev_p = NULL;
+#ifdef RGB30
+	const char *file="/dev/input/event3";
+#else
 	const char *file="/dev/input/event2";
+#endif
 	const char *emulator="";
 	
 	int fd, fd_p;
@@ -991,6 +1139,8 @@ main(int argc, char **argv)
 
 	struct uinput_setup usetup;
 
+	system("sudo chmod 666 /dev/uinput");
+	
 	/*int */fd_uinput = open("/dev/uinput", O_RDWR/*O_WRONLY*/ | O_NONBLOCK);
     if (fd_uinput < 0) {
         printf("failed to open device %s\n", strerror(errno));
@@ -1058,17 +1208,17 @@ main(int argc, char **argv)
 	ioctl(fd_uinput, UI_SET_KEYBIT, BTN_WEST);
 	ioctl(fd_uinput, UI_SET_KEYBIT, BTN_TL);
 	ioctl(fd_uinput, UI_SET_KEYBIT, BTN_TR);
-/*
+#ifdef RGB30
 	ioctl(fd_uinput, UI_SET_KEYBIT, BTN_START);
 	ioctl(fd_uinput, UI_SET_KEYBIT, BTN_SELECT);
 	ioctl(fd_uinput, UI_SET_KEYBIT, BTN_THUMBL);
 	ioctl(fd_uinput, UI_SET_KEYBIT, BTN_THUMBR);
-*/
+#else
 	ioctl(fd_uinput, UI_SET_KEYBIT, BTN_TRIGGER_HAPPY1);
 	ioctl(fd_uinput, UI_SET_KEYBIT, BTN_TRIGGER_HAPPY2);
 	ioctl(fd_uinput, UI_SET_KEYBIT, BTN_TRIGGER_HAPPY3);
 	ioctl(fd_uinput, UI_SET_KEYBIT, BTN_TRIGGER_HAPPY4);
-	
+#endif	
 	ioctl(fd_uinput, UI_SET_KEYBIT, BTN_TL2);
 	ioctl(fd_uinput, UI_SET_KEYBIT, BTN_TR2);
 	
@@ -1129,13 +1279,23 @@ main(int argc, char **argv)
 	//ioctl(fd_uinput, UI_DEV_SETUP, &usetup); // *
 
 	ioctl(fd_uinput, UI_DEV_CREATE);
-	
+
+#ifdef RGB30
+	// for RGB30
+	system("sudo chmod a+w /sys/class/pwm/pwmchip1/export");
+	system("echo 0 > /sys/class/pwm/pwmchip1/export");
+	system("sudo chown -R ark:ark /sys/class/pwm/pwmchip1/pwm0");
+	system("echo 10000 > /sys/class/pwm/pwmchip1/pwm0/period");
+	system("echo 10000 > /sys/class/pwm/pwmchip1/pwm0/duty_cycle");
+	system("echo 1 > /sys/class/pwm/pwmchip1/pwm0/enable");
+#else	
 	// for RG351P
 	system("echo 0 > /sys/class/pwm/pwmchip0/export");
 	system("sudo chown -R odroid:odroid /sys/class/pwm/pwmchip0/pwm0");
 	system("echo 10000 > /sys/class/pwm/pwmchip0/pwm0/period");
 	system("echo 10000 > /sys/class/pwm/pwmchip0/pwm0/duty_cycle");
 	system("echo 1 > /sys/class/pwm/pwmchip0/pwm0/enable");
+#endif
 
 #if 0//def RG351V_RUMBLE
 	static GMainLoop *m_gmain;
@@ -1234,6 +1394,12 @@ main(int argc, char **argv)
 		if (enablelog)
 			printf("[trngaje] RG351P_CONTROLLER is detected\n");
 	}
+	else if (strcmp(libevdev_get_name(dev), "retrogame_joypad") == 0)
+	{
+		g_iDetected_Controller = CONTROLLER_RGB30;
+		if (enablelog)
+			printf("[trngaje] RGB30_CONTROLLER is detected\n");
+	}
 	else
 	{
 		if (enablelog)
@@ -1247,8 +1413,10 @@ main(int argc, char **argv)
 		libevdev_grab(dev, LIBEVDEV_GRAB);
 	}
 
+#ifndef RGB30
 	system("sudo rm /dev/input/event2");
 	system("sudo rm /dev/input/js0");
+#endif
 
 	if (enablelog)
 		printf("[trngaje] emulator=%s\n", emulator);
@@ -1303,7 +1471,10 @@ main(int argc, char **argv)
 			
 			if (ev.type == EV_ABS)
 			{	
-				
+#ifdef RGB30
+				emit(fd_uinput, EV_ABS, ev.code, ev.value);
+				emit(fd_uinput, EV_SYN, SYN_REPORT, 0);
+#else				
 				if (ev.code == ABS_Z) /* left analog */
 				{
 					x = 2048 - ev.value;
@@ -1356,7 +1527,7 @@ main(int argc, char **argv)
 					else
 						transferabsvalues(fd_uinput, ev.code, ev.value);					
 				}
-				
+#endif				
 				//joyb.joyhatp.joyb = uiCurButtons;
 				
 				if (enablelog)
@@ -1367,7 +1538,7 @@ main(int argc, char **argv)
 			}
 			else if (ev.type == EV_KEY)
 			{
-				if (ev.code >= BTN_SOUTH && ev.code <= BTN_START)
+				if (ev.code >= BTN_SOUTH && ev.code <= BTN_THUMBR)
 				{
 					if (ev.value == 0)
 					{
@@ -1378,21 +1549,12 @@ main(int argc, char **argv)
 						uiCurButtons |= 0x1 << (ev.code - BTN_SOUTH);
 					}
 					
-					bindbuttons(fd_uinput, ev.code, ev.value);
-/*					
-					if (ev.code == BTN_START)
-					{
-						printf("[trngaje] r2 is pressed\n");
-						emit(fd_uinput, EV_KEY, KEY_ESC, ev.value);
-						emit(fd_uinput, EV_SYN, SYN_REPORT, 0);
-					}
-*/					
-					
-					//joyb.val = uiCurButtons;
-					joyb.joyhatp.joyb = uiCurButtons;
-				}
+				}	
 				
-
+				bindbuttons(fd_uinput, ev.code, ev.value);
+						
+				//joyb.val = uiCurButtons;
+				joyb.joyhatp.joyb = uiCurButtons;
 			}
 
 /*
@@ -1404,8 +1566,18 @@ main(int argc, char **argv)
 */
 			//else
 				//print_event(&ev				
-			if (prevjoyb.val != joyb.val)
-			{
+			if (prevjoyb.val != joyb.val) {
+#ifdef RGB30
+				if (joyb.joybit.select == 1) {
+					if (joyb.joybit.start == 1) {
+						// exit
+						emit(fd_uinput, EV_KEY, KEY_ESC, 1);
+						emit(fd_uinput, EV_SYN, SYN_REPORT, 0);
+						//emit(fd_uinput, EV_KEY, KEY_ESC, 0);
+						//emit(fd_uinput, EV_SYN, SYN_REPORT, 0);							
+					}
+				}
+#else				
 				char *strenv;
 				
 				//printf("[trngaje] joy_button(%d):0x%x\n", ev.code, uiCurButtons);
@@ -1566,6 +1738,7 @@ main(int argc, char **argv)
 
 				
 				}
+#endif
 				prevjoyb.val = joyb.val;
 				
 			}
@@ -1601,8 +1774,11 @@ main(int argc, char **argv)
 					printf("[trngaje] enablegrab is true\n");
 				libevdev_grab(dev, LIBEVDEV_GRAB);
 			}
+
+#ifndef RGB30
 			system("sudo rm /dev/input/event2");
 			system("sudo rm /dev/input/js0");
+#endif
 		}
 	} while (rc == LIBEVDEV_READ_STATUS_SYNC || rc == LIBEVDEV_READ_STATUS_SUCCESS || rc == -EAGAIN);
 

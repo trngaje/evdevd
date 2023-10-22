@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-I /usr/include/libevdev-1.0 `pkg-config --cflags --libs glib-2.0`
+CFLAGS=-I /usr/include/libevdev-1.0 `pkg-config --cflags --libs glib-2.0` -DRGB30
 LDFLAGS=$(CFLAGS)
 LDLIBS=-levdev -lpthread
 OBJS=evdevd.o fifo.o
